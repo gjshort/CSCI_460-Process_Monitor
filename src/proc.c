@@ -129,7 +129,7 @@ static void show_candidates(uid_t user_id)
     DIR *dir = opendir("/proc");
     if (dir == NULL) {
         perror("opendir /proc");
-        return;
+        exit(EXIT_FAILURE);
     }
 
     // List of PIDs to be sorted and printed
