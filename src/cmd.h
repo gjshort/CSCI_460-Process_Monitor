@@ -1,6 +1,6 @@
 #ifndef CMD_H
 #define CMD_H
 
-void cmd_mode();
+int cmd_mode();
 
 #endif

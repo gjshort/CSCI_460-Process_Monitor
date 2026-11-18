@@ -76,8 +76,14 @@ int main(int argc, char *argv[])
         // Let user enter commands.
         else if (prog_status == CMD_MODE)
         {
-            cmd_mode();
-            prog_status = LIVE_MODE;
+            if (cmd_mode() == -1)
+            {
+                prog_running = 0;
+            }
+            else
+            {
+                prog_status = LIVE_MODE;
+            }
         }
 
     }

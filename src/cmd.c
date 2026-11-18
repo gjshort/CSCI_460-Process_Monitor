@@ -4,7 +4,7 @@
 
 static const char *help = "help";
 static const char *list = "list";
-static const char *status = "status PID";
+static const char *status = "status";
 static const char *stat = "stat PID";
 static const char *cmdline = "cmdline PID";
 static const char *maps = "maps PID";
@@ -17,17 +17,21 @@ static const char *quit = "quit";
 
 #define INPUT_BUF_SIZE 24
 
-void cmd_mode()
+int cmd_mode()
 {
-    
+    int retval = 0;
     int in_menu = 1;
     char input_buf[INPUT_BUF_SIZE];
+    char cmd[INPUT_BUF_SIZE];
+    int arg = -1;
+
+    fgets(input_buf, INPUT_BUF_SIZE, stdin); // Flush out the \n from menu entry
 
     while (in_menu)
     {
         if (fgets(input_buf, INPUT_BUF_SIZE, stdin) == NULL)
         {
-            perror("Error reading STDIN\n");
+            printf("Error reading STDIN\n");
         }
         else
         {
@@ -38,38 +42,101 @@ void cmd_mode()
                 input_buf[buf_str_len - 1] = '\0';
             }
 
-            if (strncmp(input_buf, help, INPUT_BUF_SIZE) == 0)
+            // Parse input buffer
+            int scan_match = sscanf(input_buf, "%s %d", cmd, &arg);
+
+            printf("%d %s %d\n", scan_match, cmd, arg);
+
+            // Only a string has been entered (or second item was not an int)
+            if (scan_match == 1)
             {
-                // help_func
-                in_menu = 1;
+                if (strncmp(cmd, help, INPUT_BUF_SIZE) == 0)
+                {
+                    // help_func
+                    in_menu = 1;
+                }
+                else if (strncmp(cmd, list, INPUT_BUF_SIZE) == 0) // Exit CMD Mode
+                {
+                    in_menu = 0;
+                }
+                else if (strncmp(cmd, cpu, INPUT_BUF_SIZE) == 0)
+                {
+                    // Display cpuinfo
+                    in_menu = 1;
+                }
+                else if (strncmp(cmd, mem, INPUT_BUF_SIZE) == 0)
+                {
+                    // Display meminfo
+                    in_menu = 1;
+                }
+                else if (strncmp(cmd, uptime, INPUT_BUF_SIZE) == 0)
+                {
+                    // Display uptime info
+                    in_menu = 1;
+                }
+                else if (strncmp(cmd, quit, INPUT_BUF_SIZE) == 0)
+                {
+                    // Quit command
+                    in_menu = 0;
+                    retval = -1;
+                }
+                else
+                {
+                    printf("Invalid Command\n");
+                }
             }
-            else if (strncmp(input_buf, list, INPUT_BUF_SIZE) == 0) // Exit CMD Mode
+
+            // A string and an int have been entered
+            else if (scan_match == 2)
             {
-                in_menu = 0;
+                if (strncmp(cmd, status, INPUT_BUF_SIZE) == 0)
+                {
+                    // Display /proc/PID/status
+                    printf("%d\n", arg);
+                }
+                else if (strncmp(cmd, stat, INPUT_BUF_SIZE) == 0)
+                {
+                    // stat display
+                    printf("%d\n", arg);
+                }
+                else if (strncmp(cmd, cmdline, INPUT_BUF_SIZE) == 0)
+                {
+                    // Display cmdline info
+                    printf("%d\n", arg);
+                }
+                else if (strncmp(cmd, maps, INPUT_BUF_SIZE) == 0)
+                {
+                    // Display maps info
+                    printf("%d\n", arg);
+                }
+                else if (strncmp(cmd, fd, INPUT_BUF_SIZE) == 0)
+                {
+                    // Display fd info
+                    printf("%d\n", arg);
+                }
+                else if (strncmp(cmd, tasks, INPUT_BUF_SIZE) == 0)
+                {
+                    // Display tasks info
+                    printf("%d\n", arg);
+                }
+                else
+                {
+                    printf("Invalid Command\n");
+                }
             }
-            else if (strncmp(input_buf, status, INPUT_BUF_SIZE) == 0) // Exit CMD Mode
-            {
-                // Display /proc/PID/status
-                in_menu = 1;
-            }
-            else if (strncmp(input_buf, stat, INPUT_BUF_SIZE) == 0) // Exit CMD Mode
-            {
-                // stat display
-                in_menu = 1;
-            }
-            else if (strncmp(input_buf, cmdline, INPUT_BUF_SIZE) == 0) // Exit CMD Mode
-            {
-                // Display cmdline info
-                in_menu = 1;
-            }
+
+            // Invalid input
             else
             {
                 printf("Invalid Command\n");
             }
         }
 
+        // Clear buffers
+        memset(input_buf, '\0', INPUT_BUF_SIZE);
+        memset(cmd, '\0', INPUT_BUF_SIZE);
 
     }
 
-    return;
+    return retval;
 }
