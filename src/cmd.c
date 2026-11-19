@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include "cmd.h"
+#include "proc.h"
 
 static const char *help = "help";
 static const char *list = "list";
@@ -44,8 +46,7 @@ int cmd_mode()
 
             // Parse input buffer
             int scan_match = sscanf(input_buf, "%s %d", cmd, &arg);
-
-            printf("%d %s %d\n", scan_match, cmd, arg);
+            printf("==========================================================================\n");
 
             // Only a string has been entered (or second item was not an int)
             if (scan_match == 1)
@@ -92,7 +93,7 @@ int cmd_mode()
                 if (strncmp(cmd, status, INPUT_BUF_SIZE) == 0)
                 {
                     // Display /proc/PID/status
-                    printf("%d\n", arg);
+                    print_pid_status(getuid(), arg);
                 }
                 else if (strncmp(cmd, stat, INPUT_BUF_SIZE) == 0)
                 {
@@ -132,6 +133,7 @@ int cmd_mode()
             }
         }
 
+        printf("\n");
         // Clear buffers
         memset(input_buf, '\0', INPUT_BUF_SIZE);
         memset(cmd, '\0', INPUT_BUF_SIZE);

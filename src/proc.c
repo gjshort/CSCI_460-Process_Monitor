@@ -8,12 +8,17 @@
 #include <stdlib.h>
 #include "proc.h"
 
+static void print_status_header()
+{
+    printf("PID     PPID    NAME                 STATE           RSS (KiB)    THREADS\n");
+}
+
 /**
 * Collects information about a process from /proc/PID/status
 * and prints it to the terminal. Only processes with a UID
 * matching user_id will be considered.
 */
-static int get_proc_status(uid_t user_id, long pid)
+static int print_proc_status(uid_t user_id, long pid)
 {
     // Create file path to /proc/pid/status
     char path[128];
@@ -109,6 +114,7 @@ static int digits_only(const char *s)
 // Negative int for *n1 < *n2
 // Zero for *n1 = *n2
 // Positive int for *n1 > *n2
+// Used by qsort
 static int comp_ints(const void *n1, const void *n2)
 {
     long x = *((long*)n1);
@@ -119,11 +125,11 @@ static int comp_ints(const void *n1, const void *n2)
     return 0;
 }
 
-// Provided Helper Function:
+// Modified Helper Function:
 // Get a directory entry in /proc and if its name is completely
 // numeric, then it's a PID. For PIDs with UID = user_id, 
 // print PID information.
-static void show_candidates(uid_t user_id)
+static void print_user_pid_statuses(uid_t user_id)
 {
     // Open /proc directory
     DIR *dir = opendir("/proc");
@@ -179,13 +185,14 @@ static void show_candidates(uid_t user_id)
     // Print PID info from sorted list
     for (int i = 0; i < num_procs; i++)
     {
-        get_proc_status(user_id, pid_arr[i]);
+        print_proc_status(user_id, pid_arr[i]);
     }
 
     free(pid_arr);
 }
 
 
+// FOR LIVE UPDATES
 void print_user_procs(void)
 {
     uid_t user_id = getuid();
@@ -200,9 +207,50 @@ void print_user_procs(void)
     printf("\nprocmon | UID: %d | Updated: ", user_id);
     printf("%s", buffer);
     printf(" | Refresh: 2 s\n");
-    printf("PID     PPID    NAME                 STATE           RSS (KiB)    THREADS\n");
+    print_status_header();
 
     // Print user-process information
-    show_candidates(user_id);
+    print_user_pid_statuses(user_id);
+
+}
+
+
+// FOR command: status <PID>
+// Filters by UID
+void print_pid_status(uid_t user_id, long pid)
+{
+    // Open /proc directory
+    DIR *dir = opendir("/proc");
+    if (dir == NULL) 
+    {
+        perror("opendir /proc");
+        exit(EXIT_FAILURE);
+    }
+
+    for (;;)
+    {
+        errno = 0;  /* Reset immediately before each readdir call. */
+        struct dirent *entry = readdir(dir);
+        if (entry == NULL) 
+        {
+            if (errno != 0) perror("readdir /proc");
+            break;
+        }
+        // If dir is a PID
+        if (digits_only(entry->d_name))
+        {
+            // If PID dir matches requested PID
+            long pid_dir = strtol(entry->d_name, NULL, 10);
+            if (pid_dir == pid)
+            {
+                // Print select info in /proc/PID/status
+                print_status_header();
+                print_proc_status(user_id, pid_dir);
+                
+                break;
+            }
+        }
+    }
+    if (closedir(dir) == -1) perror("closedir");
 
 }
