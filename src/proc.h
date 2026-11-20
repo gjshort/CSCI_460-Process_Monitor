@@ -3,5 +3,6 @@
 
 void print_user_procs(void);
 void print_pid_status(uid_t user_id, long pid);
+void print_pid_stat(uid_t user_id, long pid);
 
 #endif

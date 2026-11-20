@@ -7,7 +7,7 @@
 static const char *help = "help";
 static const char *list = "list";
 static const char *status = "status";
-static const char *stat = "stat PID";
+static const char *stat = "stat";
 static const char *cmdline = "cmdline PID";
 static const char *maps = "maps PID";
 static const char *fd = "fd PID";
@@ -97,8 +97,8 @@ int cmd_mode()
                 }
                 else if (strncmp(cmd, stat, INPUT_BUF_SIZE) == 0)
                 {
-                    // stat display
-                    printf("%d\n", arg);
+                    // stat display (see Appendix below)
+                    print_pid_stat(getuid(), arg);
                 }
                 else if (strncmp(cmd, cmdline, INPUT_BUF_SIZE) == 0)
                 {
@@ -142,3 +142,22 @@ int cmd_mode()
 
     return retval;
 }
+
+//==================================================
+// APPENDIX
+//==================================================
+/*
+/proc/PID/stat fields:
+
+#: Field        Meaning
+1:  pid         Process ID
+2:  comm        Parenthesized process name
+3:  state       State code
+4:  ppid        Parent PID
+14: utime       Accumulated user-mode CPU ticks
+15: stime       Accumulated kernel-mode CPU ticks
+18: priority    Kernel-reported scheduling priority value
+19: nice        Nice value
+20: num_threads Thread count
+22: starttime   Start time in ticks since boot
+*/

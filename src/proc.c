@@ -6,12 +6,111 @@
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "proc.h"
 
 static void print_status_header()
 {
     printf("PID     PPID    NAME                 STATE           RSS (KiB)    THREADS\n");
 }
+
+// Prints select info from /proc/<PID>/stat
+// Filters by UID
+// Field sizes based on Linux Man Pages: 
+// https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html
+static int print_proc_stat(uid_t user_id, long pid)
+{
+    // Create file path to /proc/pid/status
+    char path[128];
+    int n = snprintf(path, sizeof(path), "/proc/%ld/stat", pid);
+    if (n < 0 || (size_t)n >= sizeof(path))
+    {
+        perror("Invalid /proc/<pid>/stat path");
+        return -1;
+    }
+    
+    // Open proc's stat file
+    FILE *proc_file = fopen(path, "r");
+    if (proc_file == NULL)
+    {
+        perror("Could not open /proc/PID/stat for some process");
+        return -1;
+    }
+
+    // Parse /proc/PID/status fields
+    char buffer[1024];
+    
+    // Copy the 1-line entry of stat into the buffer
+    fgets(buffer, sizeof(buffer), proc_file);
+
+    // Record Parsing variables
+    char *token;
+    int num_fields = 10;
+
+    long field_pid;
+    char name[16];
+    char state;
+    int ppid;
+    unsigned long utime;
+    unsigned long stime;
+    long priority;
+    long nice;
+    long num_threads;
+    unsigned long long starttime;
+
+    // Parse PID
+    token = strtok(buffer, " ");
+    if (token != NULL)
+    {
+        if (sscanf(token, "%ld ", &field_pid) == 1)
+        {
+            printf("PID: %ld\n", field_pid);
+        }
+        else { goto error; }
+    }
+    else { goto error; }
+
+    // Parse process name (could contain spaces or parentheses).
+    // Comes wrapped in parentheses
+    token = strtok(NULL, " ");
+    if (token != NULL)
+    {
+        token[strlen(token) - 1] = '\0'; // Removing ending parentheses
+        if (sscanf(token, "(%15[^\n]", name) == 1) // Allow whitespace except newline
+        {
+            printf("Name: %s\n", name);
+        }
+        else { goto error; }
+    }
+    else { goto error; }
+    
+    // ---- TODO ---- 
+    // Parse remainder of record on whitespace and string skipping
+    int scan_match = sscanf(token, " %c %d %*s %*s %*s %*s %*s %*s %*s %*s %*s %lu %lu %*s %*s %ld %ld %ld %*s %llu %*s", 
+                            &state, &ppid, &utime, &stime, &priority, &nice, &num_threads, &starttime);
+    
+    if (scan_match == num_fields - 2)
+    {
+        printf("%c %d %lu %lu %ld %ld %ld %llu\n", state, ppid, utime, stime, priority, nice, num_threads, starttime);
+    }
+    else 
+    {
+        printf("%d", scan_match); 
+        goto error; 
+    }
+
+    goto ret;
+
+error:
+    printf("Error parsing /proc/%ld/stat\n", pid);
+    return -1;
+
+ret:
+    fclose(proc_file);
+    return 0;
+
+} 
+
 
 /**
 * Collects information about a process from /proc/PID/status
@@ -192,6 +291,46 @@ static void print_user_pid_statuses(uid_t user_id)
 }
 
 
+// Chcecks if given PID is present in /proc
+bool pid_in_proc(long pid)
+{
+    bool retval = false;
+
+    // Open /proc directory
+    DIR *dir = opendir("/proc");
+    if (dir == NULL) 
+    {
+        perror("opendir /proc");
+        exit(EXIT_FAILURE);
+    }
+
+    for (;;)
+    {
+        errno = 0;  /* Reset immediately before each readdir call. */
+        struct dirent *entry = readdir(dir);
+        if (entry == NULL) 
+        {
+            if (errno != 0) perror("readdir /proc");
+            break;
+        }
+        // If dir is a PID
+        if (digits_only(entry->d_name))
+        {
+            // If PID dir matches requested PID
+            long pid_dir = strtol(entry->d_name, NULL, 10);
+            if (pid_dir == pid)
+            {
+                retval = true;;
+                break;
+            }
+        }
+    }
+    if (closedir(dir) == -1) perror("closedir");
+
+    return retval;
+}
+
+
 // FOR LIVE UPDATES
 void print_user_procs(void)
 {
@@ -217,40 +356,37 @@ void print_user_procs(void)
 
 // FOR command: status <PID>
 // Filters by UID
+// Display select contents of /proc/PID/status
 void print_pid_status(uid_t user_id, long pid)
 {
-    // Open /proc directory
-    DIR *dir = opendir("/proc");
-    if (dir == NULL) 
+    if (pid_in_proc(pid))
     {
-        perror("opendir /proc");
-        exit(EXIT_FAILURE);
+        // Print select info in /proc/PID/status
+        print_status_header();
+        print_proc_status(user_id, pid);
+    }
+    else
+    {
+        printf("PID %ld not in /proc\n", pid);
     }
 
-    for (;;)
+}
+
+
+// FOR command: stat <PID>
+// Filters by UID
+// Display select contents of /proc/PID/stat
+void print_pid_stat(uid_t user_id, long pid)
+{
+    if (pid_in_proc(pid))
     {
-        errno = 0;  /* Reset immediately before each readdir call. */
-        struct dirent *entry = readdir(dir);
-        if (entry == NULL) 
-        {
-            if (errno != 0) perror("readdir /proc");
-            break;
-        }
-        // If dir is a PID
-        if (digits_only(entry->d_name))
-        {
-            // If PID dir matches requested PID
-            long pid_dir = strtol(entry->d_name, NULL, 10);
-            if (pid_dir == pid)
-            {
-                // Print select info in /proc/PID/status
-                print_status_header();
-                print_proc_status(user_id, pid_dir);
-                
-                break;
-            }
-        }
+        // Print select info in /proc/PID/stat
+        //print_status_header();
+        print_proc_stat(user_id, pid);
     }
-    if (closedir(dir) == -1) perror("closedir");
+    else
+    {
+        printf("PID %ld not in /proc\n", pid);
+    }
 
 }
